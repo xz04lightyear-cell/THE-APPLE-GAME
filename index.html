@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE APPLE - V9.0.0 (REAL-TIME ALPHA)</title>
+<style>
+    :root {
+        --garden-green: #2d5a27; --leaf-light: #d4edda; --earth-brown: #5d4037;
+        --bg-color: #f1f8e9; --text-gray: #888; --accent-red: #e74c3c;
+    }
+    body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--garden-green); margin: 0; padding: 20px; }
+    .header-info { text-align: center; margin-bottom: 15px; }
+    .stats-container { text-align: center; margin-bottom: 20px; }
+    .stats-bar { background: white; padding: 10px 25px; border-radius: 50px; display: inline-block; font-weight: bold; border: 2px solid var(--garden-green); box-shadow: 2px 2px 0px var(--leaf-light); }
+    .main-container { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+    .game-card { min-width: 280px; background: white; border-radius: 12px; padding: 15px; border: 2px solid var(--garden-green); box-shadow: 4px 4px 0px var(--leaf-light); flex: 1; }
+    .card-label { font-size: 0.8rem; font-weight: bold; color: var(--earth-brown); margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+    .data-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; margin-bottom: 2px; min-height: 32px; }
+    .item-info-inline { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+    .type-label { font-size: 0.65rem; color: var(--text-gray); margin-left: 2px; }
+    .item-qty { font-family: monospace; font-weight: bold; margin-right: 8px; }
+    .main-text { font-size: 0.85rem; font-weight: bold; color: #333; }
+    .progress-container { width: 100%; background: #eee; border-radius: 10px; height: 8px; overflow: hidden; }
+    .progress-bar { height: 100%; background: var(--garden-green); width: 0%; transition: width 0.3s; }
+    button { cursor: pointer; border: none; border-radius: 5px; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-action { background: var(--garden-green); color: white; }
+    .btn-destroy { background: var(--accent-red); color: white; }
+    .btn-harvest { background: #f1c40f; color: #333; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
+    .modal-content { background: white; padding: 20px; border-radius: 15px; width: 280px; text-align: center; border: 3px solid var(--earth-brown); }
+    .menu-options { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .btn-opt { background: #f8f8f8; color: #333; padding: 12px; border: 1px solid #ddd; }
+    .info-box { padding: 10px; border-radius: 8px; text-align: left; }
+    .box-lose { background: #fff5f5; border: 1px solid #feb2b2; }
+    .box-get { background: #f0f9ff; border: 1px solid #bee3f8; }
+    .label-mini { font-size: 0.6rem; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 4px; color: #888; }
+    .preview-item { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 0.9rem; font-weight: bold; }
+    .text-enough { color: #2d5a27; }
+    .text-not-enough { color: #e74c3c; text-decoration: underline; }
+    .lifespan-tag { font-size: 0.7rem; color: #d35400; font-weight: bold; }
+    input[type=number] { -moz-appearance: textfield; border: none; background: transparent; }
+</style>
+</head>
+<body>
+
+    <div class="header-info">
+        <h2 style="margin:0;">🍎 THE APPLE</h2>
+        <div id="date"></div>
+        <div id="time" style="font-size: 1.2rem; font-weight: bold;"></div>
+        <div style="color:#2d5a27; font-size:0.7rem;">Real-Time Alpha Mode</div>
+    </div>
+
+    <div class="stats-container">
+        <div class="stats-bar">⚡ พลังงาน: <span id="stat-energy">0</span></div>
+    </div>
+
+    <div class="main-container">
+        <div class="game-card">
+            <div class="card-label">คลังเก็บของ</div>
+            <div id="inventory-list"></div>
+        </div>
+        <div class="game-card">
+            <div class="card-label">การเพาะปลูก</div>
+            <div id="farming-list"></div>
+        </div>
+    </div>
+
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <div id="modal-header" style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:5px;"></div>
+            <div id="function-selector" class="menu-options">
+                <button id="opt-eat" class="btn-opt" onclick="setupAction('eat')">🍽️ กิน</button>
+                <button id="opt-trade" class="btn-opt" onclick="showTradeSelector()">🔄 แลก</button>
+                <button id="opt-plant" class="btn-opt" onclick="showPlantSelector()">🌱 ปลูก</button>
+                <button onclick="closeModal()" style="color:#888; background:none;">ยกเลิก</button>
+            </div>
+            <div id="trade-selector" class="menu-options" style="display:none;">
+                <button class="btn-opt" onclick="setupAction('trade_soil')">🟫 ดิน</button>
+                <button class="btn-opt" onclick="setupAction('trade_water')">💧 น้ำ</button>
+                <button class="btn-opt" onclick="setupAction('trade_stone')">🪨 หิน</button>
+                <button onclick="backToMain()" style="background:none; color:#666;">ย้อนกลับ</button>
+            </div>
+            <div id="plant-selector" class="menu-options" style="display:none;">
+                <button class="btn-opt" onclick="setupAction('plant_apple')">🍎 แอปเปิล</button>
+                <button onclick="backToMain()" style="background:none; color:#666;">ย้อนกลับ</button>
+            </div>
+            <div id="action-panel" style="display:none;">
+                <div id="lose-section" class="info-box box-lose">
+                    <span class="label-mini" style="color:#c53030;">🔻 ต้องใช้</span>
+                    <div id="cost-preview"></div>
+                </div>
+                <div id="amount-controller" style="margin: 12px 0; padding: 8px; background: #f9f9f9; border-radius: 10px; border: 1px dashed #ccc;">
+                    <div id="max-label" style="font-size:0.65rem; color:#666; margin-bottom:4px;">ระบุจำนวน</div>
+                    <div style="display:flex; justify-content:center; align-items:center; gap:12px;">
+                        <button onclick="changeAmt(-1)" style="width:32px; height:32px; background:white; border:1px solid #ddd; border-radius:50%; font-weight:bold;"> - </button>
+                        <input type="number" id="action-amount" value="1" min="1" oninput="validateInput()" style="width:60px; text-align:center; font-size:1.1rem; font-weight:bold;">
+                        <button onclick="changeAmt(1)" style="width:32px; height:32px; background:white; border:1px solid #ddd; border-radius:50%; font-weight:bold;"> + </button>
+                    </div>
+                </div>
+                <div id="get-section" class="info-box box-get">
+                    <span class="label-mini" style="color:#2b6cb0;">🔹 ได้รับ</span>
+                    <div id="gain-preview"></div>
+                </div>
+                <button id="btn-submit" class="btn-action" style="width:100%; padding:12px; margin-top:12px;" onclick="executeAction()">ยืนยัน</button>
+                <button id="btn-back" onclick="backToPrevious()" style="background:none; color:#888; margin-top:5px; font-size:0.7rem;">ย้อนกลับ</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const ITEM_DB = {
+    apple: { name: 'แอปเปิล', icon: '🍎', type: 'God Food' },
+    soil:  { name: 'ดิน',    icon: '🟫', type: 'Nature' },
+    water: { name: 'น้ำ',    icon: '💧', type: 'Nature' },
+    stone: { name: 'หิน',    icon: '🪨', type: 'Nature' },
+    stick: { name: 'กิ่งไม้', icon: '🥢', type: 'Material' }
+};
+
+const ACTIONS = {
+    eat: { input: { apple: 1 }, output: { energy: 1 }, costE: 0 },
+    trade_soil: { input: { apple: 1 }, output: { soil: 1 }, costE: 0 },
+    trade_water: { input: { apple: 1 }, output: { water: 1 }, costE: 0 },
+    trade_stone: { input: { apple: 1 }, output: { stone: 1 }, costE: 0 },
+    plant_apple: { input: { apple: 1, soil: 1, water: 1 }, output: { farming: 'apple' }, costE: 4 },
+    f_water: { input: { water: 1 }, costE: 1, label: 'รดน้ำ' },
+    f_destroy: { costE: 1, label: 'ทำลาย' },
+    f_harvest: { costE: 1, label: 'เก็บเกี่ยว' }
+};
+
+const GROWTH_STAGES = {
+    seed:  { name: 'ต้นอ่อน', icon: '🌱', hours: 12, next: 'small', canDestroy: true },
+    small: { name: 'ต้นแอปเปิล(เล็ก)', icon: '🌿', hours: 36, next: 'big', canDestroy: true, gain: { stick: 3 } },
+    big:   { name: 'ต้นแอปเปิล(ใหญ่)', icon: '🌳', hours: 24, next: 'ready', canDestroy: true, gain: { stick: 5 } },
+    ready: { name: 'พร้อมเก็บเกี่ยว', icon: '🍎🌳', canHarvest: true, canDestroy: true, gain: { stick: 5 } }
+};
+
+// --- INITIAL STATE & SAVE SYSTEM ---
+let gameState = { 
+    energy: 0, 
+    inventory: { apple: 40, soil: 0, water: 0, stone: 0, stick: 0 },
+    farms: [],
+    lastDailyApple: null 
+};
+
+function saveGame() {
+    localStorage.setItem('the_apple_save_v9', JSON.stringify(gameState));
+}
+
+function loadGame() {
+    const saved = localStorage.getItem('the_apple_save_v9');
+    if (saved) {
+        const loaded = JSON.parse(saved);
+        gameState = Object.assign(gameState, loaded);
+    }
+}
+
+// --- CORE LOGIC ---
+let currentAction = '', currentItemId = '', currentFarmIdx = -1;
+
+function checkDailyApple() {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    if (now.getHours() >= 7) {
+        if (gameState.lastDailyApple !== todayStr) {
+            gameState.inventory.apple += 1;
+            gameState.lastDailyApple = todayStr;
+            saveGame();
+        }
+    }
+}
+
+setInterval(() => {
+    checkDailyApple();
+    const now = Date.now();
+    gameState.farms.forEach(p => {
+        const s = GROWTH_STAGES[p.stage];
+        if (s.hours && p.isWatered) {
+            const msPassed = now - p.startTime;
+            const hoursPassed = msPassed / (1000 * 60 * 60);
+            if (hoursPassed >= s.hours) {
+                p.stage = s.next;
+                p.startTime = Date.now();
+                p.isWatered = false;
+            }
+        }
+    });
+    updateTimeDisplay();
+    render();
+    saveGame();
+}, 1000);
+
+function updateTimeDisplay() {
+    const now = new Date();
+    document.getElementById('date').innerText = now.toLocaleDateString('th-TH', {year:'numeric', month:'long', day:'numeric'});
+    document.getElementById('time').innerText = now.toLocaleTimeString('th-TH', {hour12:false});
+}
+
+// --- 2. แก้ไขส่วนการแสดงผลไอเทม (แสดงเฉพาะที่มี > 0) ---
+function render() {
+    document.getElementById('stat-energy').innerText = Math.floor(gameState.energy);
+    
+    const invList = document.getElementById('inventory-list');
+    invList.innerHTML = '';
+    
+    let hasItem = false;
+    Object.keys(gameState.inventory).forEach(id => {
+        const qty = gameState.inventory[id];
+        if (qty > 0) {
+            hasItem = true;
+            invList.innerHTML += `
+                <div class="data-row">
+                    <div class="item-info-inline">
+                        <span>${ITEM_DB[id].icon}</span>
+                        <span class="main-text">${ITEM_DB[id].name} <span class="type-label">(${ITEM_DB[id].type})</span></span>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <span class="item-qty">x${qty}</span>
+                        <button class="btn-action" style="padding: 2px 6px; font-size: 0.7rem;" onclick="openModalMenu('${id}')">ใช้</button>
+                    </div>
+                </div>`;
+        }
+    });
+
+    if (!hasItem) {
+        invList.innerHTML = '<div style="color:#ccc; text-align:center; padding:10px; font-size:0.8rem;">- ไม่มีไอเทมในคลัง -</div>';
+    }
+
+    const farmList = document.getElementById('farming-list');
+    farmList.innerHTML = '';
+    if (gameState.farms.length === 0) farmList.innerHTML = '<div style="color:#ccc; text-align:center; padding:20px;">- พื้นที่ว่าง -</div>';
+    
+    gameState.farms.forEach((p, idx) => {
+        const s = GROWTH_STAGES[p.stage];
+        const now = Date.now();
+        const msPassed = now - p.startTime;
+        const hoursPassed = msPassed / (1000 * 60 * 60);
+        let prog = 100;
+        let timeLabel = '✨ READY';
+
+        if (s.hours) {
+            prog = (hoursPassed / s.hours) * 100;
+            if (prog > 100) prog = 100;
+            const remainingMs = (s.hours * 60 * 60 * 1000) - msPassed;
+            if (!p.isWatered) {
+                timeLabel = '💧 ต้องการน้ำ';
+            } else {
+                const h = Math.floor(remainingMs / (1000 * 60 * 60));
+                const m = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+                timeLabel = `${h}ชม. ${m}นาที`;
+            }
+        }
+
+        let lifeTag = (p.stage === 'big' || p.stage === 'ready') ? `<span class="lifespan-tag"> (${p.harvestCount || 0}/10)</span>` : '';
+        let btns = p.stage === 'ready' ? `<button class="btn-harvest" onclick="openFarmAction('f_harvest', ${idx})">เก็บเกี่ยว</button>` : !p.isWatered ? `<button class="btn-action" onclick="openFarmAction('f_water', ${idx})">รดน้ำ</button>` : '';
+        
+        // แก้ไขจาก "ลบ" เป็น "ทำลาย" ตรงนี้ครับ
+        if (s.canDestroy) btns += ` <button class="btn-destroy" onclick="openFarmAction('f_destroy', ${idx})">ทำลาย</button>`;
+
+        farmList.innerHTML += `
+            <div class="data-row" style="flex-direction:column; align-items:flex-start; padding: 6px 10px;">
+                <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
+                    <div class="item-info-inline">
+                        <span>${s.icon}</span>
+                        <span class="main-text">${s.name}${lifeTag}</span>
+                    </div>
+                    <div>${btns}</div>
+                </div>
+                <div style="display: flex; align-items: center; width: 100%; gap: 10px; margin-top: 5px;">
+                    <div class="progress-container" style="flex: 1;"><div class="progress-bar" style="width:${prog}%"></div></div>
+                    <div style="font-size:0.6rem; color:#666; white-space:nowrap; font-family:monospace;">${timeLabel}</div>
+                </div>
+            </div>`;
+    });
+}
+
+// --- MODAL & ACTIONS LOGIC (เดิมแต่ปรับค่า startTime) ---
+function openFarmAction(actionKey, idx) {
+    currentAction = actionKey; currentFarmIdx = idx;
+    document.getElementById('itemModal').style.display = 'flex';
+    document.getElementById('modal-header').innerText = `ยืนยัน${ACTIONS[actionKey].label}`;
+    hideAllModalPanels(); document.getElementById('action-panel').style.display = 'block';
+    document.getElementById('amount-controller').style.display = (actionKey === 'f_harvest') ? 'block' : 'none';
+    updateActionPreview();
+}
+
+function openModalMenu(id) {
+    currentItemId = id; document.getElementById('itemModal').style.display = 'flex';
+    document.getElementById('modal-header').innerText = `${ITEM_DB[id].icon} ${ITEM_DB[id].name}`;
+    hideAllModalPanels(); backToMain();
+    document.getElementById('opt-eat').style.display = (id === 'apple') ? 'block' : 'none';
+    document.getElementById('opt-trade').style.display = (id === 'apple') ? 'block' : 'none';
+}
+
+function hideAllModalPanels() { ['function-selector','trade-selector','plant-selector','action-panel'].forEach(id => document.getElementById(id).style.display = 'none'); }
+function backToMain() { hideAllModalPanels(); document.getElementById('function-selector').style.display = 'flex'; }
+function backToPrevious() { (currentFarmIdx !== -1) ? closeModal() : (currentAction.startsWith('trade')) ? showTradeSelector() : backToMain(); }
+function showTradeSelector() { hideAllModalPanels(); document.getElementById('trade-selector').style.display = 'flex'; }
+function showPlantSelector() { if (currentItemId === 'apple') { setupAction('plant_apple'); return; } hideAllModalPanels(); document.getElementById('plant-selector').style.display = 'flex'; }
+
+function setupAction(key) {
+    currentAction = key; hideAllModalPanels();
+    document.getElementById('action-panel').style.display = 'block';
+    document.getElementById('amount-controller').style.display = 'block';
+    document.getElementById('action-amount').value = 1;
+    updateActionPreview();
+}
+
+function validateInput() {
+    let input = document.getElementById('action-amount');
+    let val = parseInt(input.value);
+    if (isNaN(val) || val < 1) input.value = 1;
+    if (currentAction === 'f_harvest' && val > 2) input.value = 2;
+    updateActionPreview();
+}
+
+function changeAmt(v) {
+    let input = document.getElementById('action-amount');
+    let next = (parseInt(input.value) || 1) + v;
+    if (next < 1) next = 1;
+    if (currentAction === 'f_harvest' && next > 2) next = 2;
+    input.value = next; updateActionPreview();
+}
+
+function updateActionPreview() {
+    const amt = (currentAction==='f_harvest' || !currentAction.startsWith('f_')) ? (parseInt(document.getElementById('action-amount').value) || 1) : 1;
+    const act = ACTIONS[currentAction];
+    const costDiv = document.getElementById('cost-preview');
+    const gainDiv = document.getElementById('gain-preview');
+    const submitBtn = document.getElementById('btn-submit'); // อ้างอิงถึงปุ่มยืนยัน
+    
+    let canDo = true;
+    let reason = ""; // เก็บเหตุผลที่กดไม่ได้
+
+    costDiv.innerHTML = '';
+    
+    // 1. เช็คทรัพยากรในคลัง
+    if (act.input) {
+        Object.keys(act.input).forEach(id => {
+            const req = act.input[id] * amt;
+            const ok = gameState.inventory[id] >= req;
+            if (!ok) {
+                canDo = false;
+                reason = "ทรัพยากรไม่พอ";
+            }
+            costDiv.innerHTML += `<div class="preview-item ${ok?'text-enough':'text-not-enough'}">${ITEM_DB[id].icon} x${req}</div>`;
+        });
+    }
+
+    // 2. เช็คพลังงาน
+    const eReq = (act.costE || 0) * amt;
+    const eOk = gameState.energy >= eReq;
+    if (!eOk) {
+        canDo = false;
+        reason = "พลังงานไม่พอ";
+    }
+    costDiv.innerHTML += `<div class="preview-item ${eOk?'text-enough':'text-not-enough'}">⚡ x${eReq}</div>`;
+
+    // 3. ปรับแต่งข้อความปุ่ม
+    if (canDo) {
+        submitBtn.innerText = "ยืนยัน";
+        submitBtn.style.background = "var(--garden-green)";
+        submitBtn.disabled = false;
+    } else {
+        submitBtn.innerText = reason; // แสดง "ทรัพยากรไม่พอ" หรือ "พลังงานไม่พอ"
+        submitBtn.style.background = "#95a5a6"; // เปลี่ยนเป็นสีเทา
+        submitBtn.disabled = true;
+    }
+
+    // ส่วนแสดงผล Gain (ได้รับอะไรบ้าง)
+    let gHtml = '-';
+    if (currentAction === 'eat') gHtml = `⚡ +${amt}`;
+    else if (currentAction.startsWith('trade_')) gHtml = `${ITEM_DB[currentAction.split('_')[1]].icon} +${amt}`;
+    else if (currentAction === 'plant_apple') gHtml = `🌱 ปลูก ${amt} ต้น`;
+    else if (currentAction === 'f_harvest') gHtml = `🍎 +10 ${amt==2?'🥢 +3':''}`;
+    else if (currentAction === 'f_water') gHtml = `✅ บำรุงรักษา`;
+    
+    gainDiv.innerHTML = gHtml;
+}
+
+function executeAction() {
+    const amt = (currentAction==='f_harvest' || !currentAction.startsWith('f_')) ? (parseInt(document.getElementById('action-amount').value) || 0) : 1;
+    const act = ACTIONS[currentAction];
+    if (act.input) {
+        for(let id in act.input) if(gameState.inventory[id] < act.input[id]*amt) return;
+        for(let id in act.input) gameState.inventory[id] -= act.input[id]*amt;
+    }
+    if (gameState.energy < act.costE*amt) return;
+    gameState.energy -= act.costE*amt;
+    if (currentAction === 'plant_apple') {
+        for(let i=0; i<amt; i++) gameState.farms.push({ stage: 'seed', startTime: Date.now(), isWatered: true, harvestCount: 0 });
+    } else if (currentAction === 'eat') {
+        gameState.energy += amt;
+    } else if (currentAction.startsWith('trade_')) {
+        gameState.inventory[currentAction.split('_')[1]] += amt;
+    } else if (currentAction === 'f_water') {
+        gameState.farms[currentFarmIdx].isWatered = true;
+        gameState.farms[currentFarmIdx].startTime = Date.now();
+    } else if (currentAction === 'f_destroy') {
+        const s = GROWTH_STAGES[gameState.farms[currentFarmIdx].stage];
+        if(s.gain) Object.keys(s.gain).forEach(id => gameState.inventory[id] += s.gain[id]);
+        gameState.farms.splice(currentFarmIdx, 1);
+    } else if (currentAction === 'f_harvest') {
+        gameState.inventory.apple += 10;
+        if (amt === 2) gameState.inventory.stick += 3;
+        gameState.farms[currentFarmIdx].harvestCount++;
+        if (gameState.farms[currentFarmIdx].harvestCount >= 10) {
+            gameState.farms.splice(currentFarmIdx, 1);
+            alert('🌳 ต้นไม้หมดอายุขัยแล้ว');
+        } else {
+            gameState.farms[currentFarmIdx].stage = 'big';
+            gameState.farms[currentFarmIdx].startTime = Date.now();
+            gameState.farms[currentFarmIdx].isWatered = false;
+        }
+    }
+    closeModal(); saveGame(); render();
+}
+
+function closeModal() { document.getElementById('itemModal').style.display = 'none'; currentFarmIdx = -1; }
+
+loadGame();
+updateTimeDisplay();
+render();
+</script>
+</body>
+</html>
